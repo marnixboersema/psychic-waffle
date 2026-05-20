@@ -43,7 +43,10 @@ You don't have an SSH key yet. Generate one, register it with the macOS Keychain
 
 ### A.1 Generate the keypair
 
+On a fresh Mac, `~/.ssh` doesn't exist yet — create it first, otherwise `ssh-keygen` errors with "No such file or directory":
+
 ```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
 ssh-keygen -t ed25519 -C "marnix@brein" -f ~/.ssh/id_ed25519_brein
 ```
 
@@ -66,7 +69,6 @@ To make this persist across reboots, ensure `~/.ssh/config` contains the `UseKey
 ### A.3 Configure `~/.ssh/config`
 
 ```bash
-mkdir -p ~/.ssh && chmod 700 ~/.ssh
 touch ~/.ssh/config && chmod 600 ~/.ssh/config
 ```
 
