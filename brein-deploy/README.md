@@ -68,13 +68,12 @@ To make this persist across reboots, ensure `~/.ssh/config` contains the `UseKey
 
 ### A.3 Configure `~/.ssh/config`
 
+Run this whole block in Terminal — it appends the `Host brein` entry to `~/.ssh/config`. **Do not type the lines individually**; the `cat <<'EOF' … EOF` syntax has to run as one command.
+
 ```bash
 touch ~/.ssh/config && chmod 600 ~/.ssh/config
-```
+cat >> ~/.ssh/config <<'EOF'
 
-Open `~/.ssh/config` in your editor and append:
-
-```sshconfig
 Host brein
     HostName REPLACE-WITH-IPV4-AFTER-PHASE-B
     User root
@@ -83,9 +82,10 @@ Host brein
     AddKeysToAgent yes
     UseKeychain yes
     ServerAliveInterval 60
+EOF
 ```
 
-You'll fill in `HostName` after Phase B.
+Verify with `cat ~/.ssh/config` — you should see the block. Leave `REPLACE-WITH-IPV4-AFTER-PHASE-B` literally as-is for now; you'll replace it with the real IPv4 after Phase B using `nano ~/.ssh/config` (or `open -e ~/.ssh/config` for TextEdit).
 
 ### A.4 Copy the pubkey to your clipboard
 
