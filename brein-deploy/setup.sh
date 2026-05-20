@@ -17,15 +17,19 @@ fi
 
 log() { printf '\n\033[1;34m[setup]\033[0m %s\n' "$*"; }
 
-# Wait for cloud-init to finish so apt isn't locked.
-if command -v cloud-init >/dev/null 2>&1; then
-	log "Waiting for cloud-init"
-	cloud-init status --wait >/dev/null || true
-fi
+# NB: do NOT call `cloud-init status --wait` here. When this script is invoked
+# from cloud-init's runcmd (via brein-bootstrap.sh), --wait deadlocks because
+# cloud-init can't finish until runcmd returns, and runcmd can't return until
+# --wait returns. When run manually post-boot, cloud-init has already finished
+# anyway. Retry on transient apt-lock races (unattended-upgrades first-boot).
 
 log "Updating apt + base packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+for i in 1 2 3 4 5; do
+	apt-get update -y && break
+	log "apt-get update attempt $i failed, retrying in 5s..."
+	sleep 5
+done
 apt-get install -y \
 	ca-certificates curl gnupg lsb-release \
 	ufw fail2ban unattended-upgrades \

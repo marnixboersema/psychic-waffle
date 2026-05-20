@@ -50,12 +50,16 @@ write_files:
 
       export DEBIAN_FRONTEND=noninteractive
 
-      # Cloud-init's package phase may still hold apt; wait it out.
-      if command -v cloud-init >/dev/null 2>&1; then
-        cloud-init status --wait || true
-      fi
-
-      apt-get update -y
+      # NB: do NOT call `cloud-init status --wait` here. This script is invoked
+      # from cloud-init's runcmd, so `--wait` deadlocks (cloud-init can't finish
+      # until runcmd returns; runcmd can't return until --wait returns). The
+      # cloud-config `package_update: true` step already ran before runcmd, so
+      # apt is free by the time we get here. Retry on transient apt-lock races.
+      for i in 1 2 3 4 5; do
+        apt-get update -y && break
+        echo "apt-get update attempt $i failed, retrying in 5s..."
+        sleep 5
+      done
       apt-get install -y git
 
       if [[ ! -d /opt/brein-src/.git ]]; then
