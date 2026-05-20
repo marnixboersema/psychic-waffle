@@ -1,0 +1,6 @@
+# Brein — weekly backup, Sundays at 03:00 server time.
+# Install with:
+#   crontab -l 2>/dev/null > /tmp/cron.tmp || true
+#   cat crontab.txt >> /tmp/cron.tmp
+#   crontab /tmp/cron.tmp && rm /tmp/cron.tmp
+0 3 * * 0 /opt/brein/backup.sh >> /var/log/brein-backup.log 2>&1
