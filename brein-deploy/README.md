@@ -117,6 +117,7 @@ Go to https://console.hetzner.cloud/ and sign in (create an account if needed).
 - **Networking**: Public IPv4 + Public IPv6 both enabled (default).
 - **SSH Keys**: tick `mac-brein`.
 - **Volumes / Firewalls / Backups**: leave blank for now (we'll add a firewall next; Open WebUI's own backup script replaces Hetzner's paid backup feature).
+- **Cloud config** (under "Advanced"): paste the entire contents of `brein-deploy/cloud-init.yaml`. The VPS will auto-install Docker + Caddy + UFW + fail2ban + swap + clone the repo on first boot (~2 minutes), so you can skip most of Phase D.1.
 - **Name**: `brein`.
 - **Create & Buy now**.
 
@@ -150,7 +151,7 @@ You should land at `root@brein:~#`. Type `exit` for now — DNS first.
 
 ## Phase C — DNS
 
-At your registrar's DNS control panel (e.g. domains.co.za, Afrihost, Hetzner DNS, etc.), add two records on the `marnixboersema.co.za` zone:
+At Afrihost: log in to https://clientzone.afrihost.com → **My Domains** → click `marnixboersema.co.za` → **DNS Management** (sometimes labelled "Manage DNS" or "Advanced DNS"). Add two records on the zone:
 
 | Type | Name  | Value                                | TTL  |
 |------|-------|--------------------------------------|------|
@@ -178,7 +179,19 @@ SSH in.
 ssh brein
 ```
 
-### D.1 Clone the repo and bootstrap the host
+### D.1 Bootstrap the host
+
+**If you pasted `cloud-init.yaml` into the Hetzner "Cloud config" field in Phase B.3:** the VPS bootstrapped itself on first boot. Check progress:
+
+```bash
+cloud-init status --wait     # blocks until done (typically ~2 min)
+ls /opt/brein/.bootstrap-complete   # exists when finished
+tail /var/log/brein-bootstrap.log
+```
+
+Skip to D.3.
+
+**If you skipped the cloud-init step**, run the bootstrap manually:
 
 ```bash
 apt-get update -y && apt-get install -y git
@@ -189,7 +202,7 @@ bash setup.sh
 
 `setup.sh` is idempotent — safe to re-run if it gets interrupted. It installs Docker, Caddy, UFW, fail2ban, unattended-upgrades, creates a 2 GB swapfile, and prepares `/opt/brein/`, `/var/backups/brein/`, `/var/lib/brein/static/`.
 
-### D.2 Copy the deploy files into place
+### D.2 Copy the deploy files into place (skip if cloud-init did it)
 
 ```bash
 cp -r /opt/brein-src/brein-deploy/. /opt/brein/
@@ -235,7 +248,7 @@ Then on the VPS, copy the manifest into place:
 cp /opt/brein/static/manifest.webmanifest /var/lib/brein/static/
 ```
 
-### D.5 Install the Caddyfile
+### D.5 Install the Caddyfile (skip if cloud-init did it)
 
 ```bash
 cp /opt/brein/Caddyfile /etc/caddy/Caddyfile
@@ -262,7 +275,7 @@ The first account you create on the signup page becomes the **admin**. Sign up w
 
 After admin signup, signup is locked (`ENABLE_SIGNUP=false`) — you'll add the family via the admin UI.
 
-### D.7 Install the weekly backup cron
+### D.7 Install the weekly backup cron (skip if cloud-init did it)
 
 ```bash
 crontab -l 2>/dev/null > /tmp/cron.tmp || true
@@ -449,6 +462,7 @@ On the VPS after deploy:
 ├── setup.sh                # idempotent bootstrap, safe to re-run
 ├── backup.sh               # cron-driven
 ├── crontab.txt
+├── cloud-init.yaml         # optional first-boot bootstrap (paste in Hetzner Console)
 ├── static/
 │   └── manifest.webmanifest
 └── README.md               # this file

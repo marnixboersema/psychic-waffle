@@ -1,0 +1,93 @@
+#cloud-config
+# =============================================================================
+# Brein — Hetzner cloud-init user-data
+# Paste this whole file into the "Cloud config" / "User data" field on the
+# Hetzner Cloud Console server-creation screen. On first boot the VPS will:
+#   1. apt update + install git
+#   2. clone https://github.com/marnixboersema/psychic-waffle
+#   3. run setup.sh (Docker, Caddy, UFW, fail2ban, swap, dirs)
+#   4. copy deploy files into /opt/brein, install /etc/caddy/Caddyfile
+#   5. install the weekly backup cron
+# It does NOT start Open WebUI — you still need to SSH in, fill /opt/brein/.env
+# with your API keys + WEBUI_SECRET_KEY, then `docker compose up -d`.
+# =============================================================================
+
+package_update: true
+package_upgrade: false   # skip the big initial upgrade; unattended-upgrades takes over after boot
+
+write_files:
+  - path: /etc/motd
+    permissions: '0644'
+    content: |
+
+      ============================================
+        Brein VPS — Open WebUI
+      ============================================
+      Cloud-init bootstraps on first boot (~2 min).
+
+      Progress:    cloud-init status --wait
+      Log:         tail -f /var/log/brein-bootstrap.log
+      Done when:   /opt/brein/.bootstrap-complete exists
+
+      Next steps after bootstrap:
+        cd /opt/brein
+        cp .env.example .env
+        openssl rand -hex 32          # paste as WEBUI_SECRET_KEY
+        nano .env                     # paste OpenAI + Anthropic keys
+        # upload PWA icons to /var/lib/brein/static/ from your Mac
+        docker compose up -d
+        docker compose ps             # wait for "healthy"
+
+      Full runbook: /opt/brein/README.md
+
+  - path: /usr/local/sbin/brein-bootstrap.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      exec > /var/log/brein-bootstrap.log 2>&1
+      echo "=== brein-bootstrap started $(date -Iseconds) ==="
+
+      export DEBIAN_FRONTEND=noninteractive
+
+      # Cloud-init's package phase may still hold apt; wait it out.
+      if command -v cloud-init >/dev/null 2>&1; then
+        cloud-init status --wait || true
+      fi
+
+      apt-get update -y
+      apt-get install -y git
+
+      if [[ ! -d /opt/brein-src/.git ]]; then
+        git clone --depth 1 https://github.com/marnixboersema/psychic-waffle.git /opt/brein-src
+      else
+        git -C /opt/brein-src pull --ff-only || true
+      fi
+
+      cd /opt/brein-src/brein-deploy
+      bash setup.sh
+
+      # Stage deploy files for the operator
+      install -d /opt/brein
+      cp -r /opt/brein-src/brein-deploy/. /opt/brein/
+
+      # Install Caddyfile (replaces the package default) and reload
+      cp /opt/brein/Caddyfile /etc/caddy/Caddyfile
+      systemctl reload caddy || systemctl restart caddy
+
+      # Stage PWA manifest (icons still need to be scp'd in by the operator)
+      install -d /var/lib/brein/static
+      cp /opt/brein/static/manifest.webmanifest /var/lib/brein/static/
+
+      # Weekly backup cron (idempotent — skip if already present)
+      if ! crontab -l 2>/dev/null | grep -q '/opt/brein/backup.sh'; then
+        (crontab -l 2>/dev/null; cat /opt/brein/crontab.txt) | crontab -
+      fi
+
+      touch /opt/brein/.bootstrap-complete
+      echo "=== brein-bootstrap complete $(date -Iseconds) ==="
+
+runcmd:
+  - [/usr/local/sbin/brein-bootstrap.sh]
+
+final_message: "Brein bootstrap launched. Tail /var/log/brein-bootstrap.log for progress; /opt/brein/.bootstrap-complete appears when done."
