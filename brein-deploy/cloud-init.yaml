@@ -62,8 +62,12 @@ write_files:
       done
       apt-get install -y git
 
+      # brein-deploy/ currently lives on the deploy branch, not main.
+      # Pin the clone to that branch until it's merged to main.
+      BREIN_BRANCH="claude/deploy-open-webui-hetzner-SLj9g"
       if [[ ! -d /opt/brein-src/.git ]]; then
-        git clone --depth 1 https://github.com/marnixboersema/psychic-waffle.git /opt/brein-src
+        git clone --depth 1 --branch "$BREIN_BRANCH" \
+          https://github.com/marnixboersema/psychic-waffle.git /opt/brein-src
       else
         git -C /opt/brein-src pull --ff-only || true
       fi
